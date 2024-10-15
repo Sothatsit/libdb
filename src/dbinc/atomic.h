@@ -144,7 +144,7 @@ typedef LONG volatile *interlocked_val;
 #define	atomic_inc(env, p)	__atomic_inc(p)
 #define	atomic_dec(env, p)	__atomic_dec(p)
 #define	atomic_compare_exchange(env, p, o, n)	\
-	__atomic_compare_exchange((p), (o), (n))
+	__db__atomic_compare_exchange((p), (o), (n))
 static inline int __atomic_inc(db_atomic_t *p)
 {
 	int	temp;
@@ -167,27 +167,9 @@ static inline int __atomic_dec(db_atomic_t *p)
 	return (temp - 1);
 }
 
-/*
- * x86/gcc Compare exchange for shared latches. i486+
- *	Returns 1 for success, 0 for failure
- *
- * GCC 4.1+ has an equivalent  __sync_bool_compare_and_swap() as well as
- * __sync_val_compare_and_swap() which returns the value read from *dest
- * http://gcc.gnu.org/onlinedocs/gcc-4.1.0/gcc/Atomic-Builtins.html
- * which configure could be changed to use.
- */
-static inline int __atomic_compare_exchange(
-	db_atomic_t *p, atomic_value_t oldval, atomic_value_t newval)
-{
-	atomic_value_t was;
-
-	if (p->value != oldval)	/* check without expensive cache line locking */
-		return 0;
-	__asm__ __volatile__("lock; cmpxchgl %1, (%2);"
-	    :"=a"(was)
-	    :"r"(newval), "r"(p), "a"(oldval)
-	    :"memory", "cc");
-	return (was == oldval);
+static inline int __db__atomic_compare_exchange(
+    db_atomic_t *p, atomic_value_t oldval, atomic_value_t newval) {
+    return __sync_bool_compare_and_swap(&p->value, oldval, newval);
 }
 #endif
 
